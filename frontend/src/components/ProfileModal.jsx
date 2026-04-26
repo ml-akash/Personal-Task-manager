@@ -1,11 +1,9 @@
 import { useState } from 'react';
 import { useAuthStore } from '../store/authStore';
-import { useNavigate } from 'react-router-dom';
 
-export default function ProfileModal({ isOpen, onClose }) {
+export default function ProfileModal({ isOpen, onClose, onLogout }) {
   const user = useAuthStore((state) => state.user);
-  const logout = useAuthStore((state) => state.logout);
-  const navigate = useNavigate();
+  const logoutFromStore = useAuthStore((state) => state.logout);
   const [activeTab, setActiveTab] = useState('details');
   const [editName, setEditName] = useState(user?.name || '');
   const [editEmail, setEditEmail] = useState(user?.email || '');
@@ -15,10 +13,38 @@ export default function ProfileModal({ isOpen, onClose }) {
 
   if (!isOpen) return null;
 
+  const performInternalLogout = () => {
+    try {
+      logoutFromStore();
+      try {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      } catch (e) {}
+      if (typeof onClose === 'function') onClose();
+      // fallback navigation
+      setTimeout(() => {
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
+      }, 100);
+    } catch (err) {
+      console.error('Internal logout failed', err);
+      alert('Logout failed. Please refresh and try again.');
+    }
+  };
+
   const handleLogout = () => {
-    logout();
-    navigate('/login');
-    onClose();
+    // prefer parent handler if provided
+    if (typeof onLogout === 'function') {
+      try {
+        onLogout();
+      } catch (err) {
+        console.warn('Parent onLogout failed, falling back to internal logout', err);
+        performInternalLogout();
+      }
+    } else {
+      performInternalLogout();
+    }
   };
 
   const handleSaveProfile = () => {
@@ -75,8 +101,6 @@ export default function ProfileModal({ isOpen, onClose }) {
 
         {/* Content */}
         <div className="p-6 overflow-y-auto max-h-80 space-y-4">
-          
-          {/* Tab 1: Details */}
           {activeTab === 'details' && (
             <div className="space-y-4">
               <div className="bg-white/5 border border-white/10 rounded-xl p-4">
@@ -101,7 +125,6 @@ export default function ProfileModal({ isOpen, onClose }) {
             </div>
           )}
 
-          {/* Tab 2: Edit Profile */}
           {activeTab === 'edit' && (
             <div className="space-y-4">
               <div>
@@ -133,7 +156,6 @@ export default function ProfileModal({ isOpen, onClose }) {
             </div>
           )}
 
-          {/* Tab 3: Change Password */}
           {activeTab === 'password' && (
             <div className="space-y-4">
               <div>
@@ -178,7 +200,6 @@ export default function ProfileModal({ isOpen, onClose }) {
             </div>
           )}
 
-          {/* Tab 4: Settings */}
           {activeTab === 'settings' && (
             <div className="space-y-3">
               <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex justify-between items-center">

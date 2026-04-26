@@ -7,9 +7,11 @@ import TaskForm from '../components/TaskForm';
 import ProfileModal from '../components/ProfileModal';
 import PendingTasksModal from '../components/PendingTasksModal';
 import ProgressBars from '../components/ProgressBars';
+import CalendarPage from '../components/CalendarPage';
 
 export default function DashboardPage() {
   const user = useAuthStore((state) => state.user);
+  const logout = useAuthStore((state) => state.logout);
   const tasks = useTaskStore((state) => state.tasks);
   const fetchTasks = useTaskStore((state) => state.fetchTasks);
   const updateTask = useTaskStore((state) => state.updateTask);
@@ -30,7 +32,7 @@ export default function DashboardPage() {
       setPendingOpen(true);
       setShowPendingOnLoad(false);
     }
-  }, [tasks]);
+  }, [tasks]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pendingTasks = tasks.filter(t => !t.completed);
   const completedTasks = tasks.filter(t => t.completed);
@@ -54,6 +56,45 @@ export default function DashboardPage() {
     }
   };
 
+  // Centralized logout handler in parent (Dashboard)
+  const handleLogout = () => {
+    try {
+      // 1) call zustand logout to clear state
+      logout();
+
+      // 2) defensively clear localStorage as well
+      try {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      } catch (e) {
+        // ignore
+      }
+
+      // 3) close profile modal if open
+      setProfileOpen(false);
+
+      // 4) navigate to login and replace history
+      navigate('/login', { replace: true });
+
+      // 5) fallback in case router doesn't navigate
+      setTimeout(() => {
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
+      }, 150);
+    } catch (err) {
+      console.error('Logout failed', err);
+      alert('Logout failed. Please try again.');
+    }
+  };
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return '🌅 Good Morning';
+    if (hour < 18) return '☀️ Good Afternoon';
+    return '🌙 Good Evening';
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       {/* Navigation */}
@@ -74,12 +115,18 @@ export default function DashboardPage() {
                   ⏳ {pendingTasks.length}
                 </button>
               )}
-              <button
-                onClick={() => setProfileOpen(true)}
-                className="w-12 h-12 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center text-white text-xl hover:shadow-lg hover:shadow-purple-500/50 transition transform hover:scale-110"
-              >
-                👤
-              </button>
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <p className="text-sm text-gray-400">{getGreeting()}</p>
+                  <p className="text-lg font-bold text-white">{user?.name || 'User'}</p>
+                </div>
+                <button
+                  onClick={() => setProfileOpen(true)}
+                  className="w-12 h-12 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center text-white text-xl hover:shadow-lg hover:shadow-purple-500/50 transition transform hover:scale-110"
+                >
+                  👤
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -92,6 +139,7 @@ export default function DashboardPage() {
             {[
               { id: 'home', label: '🏠 HOME', icon: '📊' },
               { id: 'tasks', label: '📋 TASK LIST', icon: '✓' },
+              { id: 'calendar', label: '📅 CALENDAR', icon: '📆' },
               { id: 'add', label: '➕ ADD TASK', icon: '+' }
             ].map(t => (
               <button
@@ -118,12 +166,11 @@ export default function DashboardPage() {
         {page === 'home' && (
           <div className="space-y-8">
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {[
                 { label: 'Total Tasks', value: stats.total, icon: '📊', color: 'from-blue-600 to-blue-400' },
                 { label: 'Completed', value: stats.completed, icon: '✓', color: 'from-green-600 to-green-400' },
-                { label: 'Pending', value: stats.pending, icon: '⏳', color: 'from-yellow-600 to-yellow-400' },
-                { label: 'Progress', value: stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0, icon: '%', color: 'from-purple-600 to-purple-400' }
+                { label: 'Pending', value: stats.pending, icon: '⏳', color: 'from-yellow-600 to-yellow-400' }
               ].map((stat, i) => (
                 <div key={i} className="bg-gradient-to-br from-white/10 to-white/5 border border-white/20 p-6 rounded-2xl hover:border-white/30 transition">
                   <div className="flex items-start justify-between">
@@ -159,11 +206,11 @@ export default function DashboardPage() {
                 View Pending
               </button>
               <button
-                onClick={() => setProfileOpen(true)}
-                className="bg-gradient-to-br from-blue-600 to-cyan-600 text-white font-bold py-6 rounded-2xl hover:shadow-2xl hover:shadow-blue-500/50 transition transform hover:scale-105"
+                onClick={() => setPage('calendar')}
+                className="bg-gradient-to-br from-indigo-600 to-purple-600 text-white font-bold py-6 rounded-2xl hover:shadow-2xl hover:shadow-indigo-500/50 transition transform hover:scale-105"
               >
-                <span className="text-3xl block mb-2">👤</span>
-                My Profile
+                <span className="text-3xl block mb-2">📅</span>
+                View Calendar
               </button>
             </div>
           </div>
@@ -213,7 +260,12 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* PAGE 3: ADD TASK */}
+        {/* PAGE 3: CALENDAR */}
+        {page === 'calendar' && (
+          <CalendarPage tasks={tasks} />
+        )}
+
+        {/* PAGE 4: ADD TASK */}
         {page === 'add' && (
           <div className="max-w-2xl">
             <TaskForm />
@@ -222,7 +274,11 @@ export default function DashboardPage() {
       </div>
 
       {/* Modals */}
-      <ProfileModal isOpen={profileOpen} onClose={() => setProfileOpen(false)} />
+      <ProfileModal 
+        isOpen={profileOpen} 
+        onClose={() => setProfileOpen(false)}
+        onLogout={handleLogout}
+      />
       <PendingTasksModal 
         isOpen={pendingOpen} 
         onClose={() => setPendingOpen(false)} 
