@@ -15,7 +15,7 @@ export default function TaskCard({ task }) {
   };
 
   const handleDelete = async () => {
-    if (window.confirm('Are you sure you want to delete this task?')) {
+    if (window.confirm('Delete this task?')) {
       setDeleting(true);
       try {
         await deleteTask(task._id);
@@ -26,68 +26,69 @@ export default function TaskCard({ task }) {
     }
   };
 
-  const formatDate = (date) => {
-    if (!date) return 'No due date';
-    return new Date(date).toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
-      year: 'numeric' 
-    });
+  const formatDateTime = (dateString) => {
+    if (!dateString) return 'No due date';
+    const date = new Date(dateString);
+    const dateFormatted = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const timeFormatted = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    return `${dateFormatted} at ${timeFormatted}`;
   };
 
-  const isOverdue = (date) => {
-    if (!date) return false;
-    return new Date(date) < new Date() && !task.completed;
+  const isOverdue = (dateString) => new Date(dateString) < new Date() && !task.completed;
+  const isPrioritized = (dateString) => {
+    const daysUntilDue = Math.ceil((new Date(dateString) - new Date()) / (1000 * 60 * 60 * 24));
+    return daysUntilDue <= 3 && daysUntilDue > 0;
   };
 
   const priorityColors = {
-    high: 'bg-red-100 text-red-700 border-red-300',
-    medium: 'bg-yellow-100 text-yellow-700 border-yellow-300',
-    low: 'bg-green-100 text-green-700 border-green-300'
+    high: 'from-red-600 to-red-400',
+    medium: 'from-yellow-600 to-yellow-400',
+    low: 'from-green-600 to-green-400'
   };
 
   return (
-    <div className={`bg-white p-6 rounded-lg shadow-md hover:shadow-xl transition transform hover:scale-105 ${
-      task.completed ? 'opacity-75 bg-gray-50' : ''
+    <div className={`bg-gradient-to-br from-white/10 to-white/5 border border-white/20 p-6 rounded-2xl hover:border-white/40 transition transform hover:scale-105 ${
+      task.completed ? 'opacity-60' : ''
     } ${isOverdue(task.dueDate) ? 'border-l-4 border-red-500' : ''}`}>
+      
       <div className="flex justify-between items-start mb-3">
-        <h3 className={`text-lg font-bold ${task.completed ? 'line-through text-gray-400' : 'text-gray-800'}`}>
+        <h3 className={`text-lg font-bold ${task.completed ? 'line-through text-gray-500' : 'text-white'}`}>
           {task.title}
         </h3>
-        <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${priorityColors[task.priority] || priorityColors.medium}`}>
-          {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+        <span className={`px-3 py-1 rounded-full text-xs font-bold text-white bg-gradient-to-r ${priorityColors[task.priority]}`}>
+          {task.priority}
         </span>
       </div>
-      
+
       {task.description && (
-        <p className="text-gray-600 mb-3 text-sm line-clamp-2">{task.description}</p>
+        <p className="text-gray-300 text-sm mb-3 line-clamp-2">{task.description}</p>
       )}
-      
-      <div className="flex justify-between items-center mb-4 text-sm">
-        <span className={`${isOverdue(task.dueDate) ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
-          📅 {formatDate(task.dueDate)}
-          {isOverdue(task.dueDate) && ' ⚠️ Overdue'}
+
+      <div className="flex items-center justify-between mb-4 text-xs">
+        <span className={`font-bold ${isOverdue(task.dueDate) ? 'text-red-400' : 'text-gray-400'}`}>
+          🕐 {formatDateTime(task.dueDate)}
+          {isOverdue(task.dueDate) && ' ⚠️'}
         </span>
-        {task.completed && <span className="text-green-600 font-semibold">✓ Done</span>}
+        {task.completed && <span className="text-green-400 text-lg">✓</span>}
       </div>
 
       <div className="flex gap-2">
-        <button 
+        <button
           onClick={handleComplete}
-          className={`flex-1 py-2 rounded-lg font-semibold transition ${
+          className={`flex-1 py-2 rounded-lg font-bold transition ${
             task.completed
-              ? 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-              : 'bg-green-500 text-white hover:bg-green-600'
+              ? 'bg-white/10 text-gray-300 hover:bg-white/20'
+              : 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:shadow-lg'
           }`}
         >
-          {task.completed ? '↩️ Undo' : '✓ Complete'}
+          {task.completed ? '↩️ Undo' : '✓ Done'}
         </button>
-        <button 
+        <button
           onClick={handleDelete}
           disabled={deleting}
-          className="flex-1 bg-red-500 text-white py-2 rounded-lg font-semibold hover:bg-red-600 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
+          className="flex-1 bg-red-600/30 border border-red-600/50 text-red-300 py-2 rounded-lg font-bold hover:bg-red-600/50 transition disabled:opacity-50"
         >
-          {deleting ? '...' : '🗑️ Delete'}
+          🗑️
         </button>
       </div>
     </div>
