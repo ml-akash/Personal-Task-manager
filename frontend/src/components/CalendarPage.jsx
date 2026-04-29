@@ -1,201 +1,142 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useTaskStore } from '../store/taskStore';
+import { format } from 'date-fns';
 
-export default function CalendarPage({ tasks }) {
-  const [currentDate, setCurrentDate] = useState(new Date());
+export default function CalendarPage() {
+  const tasks = useTaskStore((state) => state.tasks);
+  const fetchTasks = useTaskStore((state) => state.fetchTasks);
 
-  const monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
+  // Start date and range settings
+  const todayISO = new Date().toISOString().split('T')[0];
+  const [startDate, setStartDate] = useState(todayISO);
+  const [daysCount, setDaysCount] = useState(14);
 
-  const daysInMonth = (date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-  const firstDayOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+  useEffect(() => {
+    fetchTasks();
+  }, [fetchTasks]);
 
+  // Build array of date objects to render
+  const daysArray = useMemo(() => {
+    const list = [];
+    const base = new Date(startDate + 'T00:00:00');
+    for (let i = 0; i < Math.max(1, Number(daysCount)); i++) {
+      const d = new Date(base);
+      d.setDate(base.getDate() + i);
+      list.push(d);
+    }
+    return list;
+  }, [startDate, daysCount]);
+
+  // Group tasks by date key (YYYY-MM-DD)
   const tasksByDate = useMemo(() => {
     const map = {};
-    tasks.forEach(task => {
-      if (task.dueDate) {
-        const date = new Date(task.dueDate).toISOString().split('T')[0];
-        if (!map[date]) map[date] = [];
-        map[date].push(task);
-      }
+    (tasks || []).forEach((t) => {
+      if (!t?.dueDate) return;
+      const key = new Date(t.dueDate).toISOString().split('T')[0];
+      if (!map[key]) map[key] = [];
+      map[key].push(t);
     });
     return map;
   }, [tasks]);
 
-  const previousMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1));
+  const formatDayTitle = (date) => {
+    return format(date, 'EEE, MMM d');
   };
 
-  const nextMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1));
+  const getTasksForDate = (date) => {
+    const key = date.toISOString().split('T')[0];
+    return tasksByDate[key] || [];
   };
-
-  const getDaysArray = () => {
-    const days = [];
-    const totalDays = daysInMonth(currentDate);
-    const firstDay = firstDayOfMonth(currentDate);
-
-    for (let i = 0; i < firstDay; i++) {
-      days.push(null);
-    }
-    for (let i = 1; i <= totalDays; i++) {
-      days.push(i);
-    }
-    return days;
-  };
-
-  const getDateString = (day) => {
-    const year = currentDate.getFullYear();
-    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-    const date = String(day).padStart(2, '0');
-    return `${year}-${month}-${date}`;
-  };
-
-  const days = getDaysArray();
-  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   return (
-    <div className="space-y-6">
-      {/* Calendar Container */}
-      <div className="bg-gradient-to-br from-white/10 to-white/5 border border-white/20 rounded-2xl p-6">
-        
-        {/* Header */}
-        <div className="flex justify-between items-center mb-6">
-          <button
-            onClick={previousMonth}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-bold"
-          >
-            ← Previous
-          </button>
-          <h2 className="text-3xl font-bold text-white text-center">
-            {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
-          </h2>
-          <button
-            onClick={nextMonth}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-bold"
-          >
-            Next →
-          </button>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-800 p-6">
+      <div className="max-w-6xl mx-auto">
+        {/* Controls */}
+        <div className="bg-white/6 border border-white/8 rounded-2xl p-4 mb-6 flex flex-col md:flex-row items-center gap-4">
+          <div className="flex items-center gap-3">
+            <label className="text-sm text-gray-200 font-medium">Start Date</label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="px-3 py-2 rounded-lg bg-white/6 border border-white/8 text-white focus:outline-none"
+            />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <label className="text-sm text-gray-200 font-medium">Days</label>
+            <input
+              type="number"
+              min="1"
+              max="60"
+              value={daysCount}
+              onChange={(e) => setDaysCount(e.target.value)}
+              className="w-24 px-3 py-2 rounded-lg bg-white/6 border border-white/8 text-white focus:outline-none"
+            />
+            <p className="text-sm text-gray-400">Adjust range without changing design</p>
+          </div>
+
+          <div className="ml-auto text-sm text-gray-300">
+            <button
+              onClick={() => { setStartDate(todayISO); setDaysCount(14); }}
+              className="px-3 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:opacity-90 transition"
+            >
+              Reset
+            </button>
+          </div>
         </div>
 
-        {/* Day Names */}
-        <div className="grid grid-cols-7 gap-2 mb-4">
-          {dayNames.map(day => (
-            <div key={day} className="text-center text-gray-300 font-bold py-2">
-              {day}
-            </div>
-          ))}
-        </div>
-
-        {/* Calendar Grid */}
-        <div className="grid grid-cols-7 gap-2">
-          {days.map((day, index) => {
-            const dateString = day ? getDateString(day) : null;
-            const dayTasks = dateString ? (tasksByDate[dateString] || []) : [];
-            const isToday = day && new Date().toDateString() === new Date(currentDate.getFullYear(), currentDate.getMonth(), day).toDateString();
-
+        {/* Calendar grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {daysArray.map((d) => {
+            const dayTasks = getTasksForDate(d);
+            const completed = dayTasks.filter(t => t.completed).length;
+            const pending = dayTasks.length - completed;
             return (
-              <div
-                key={index}
-                className={`min-h-24 p-2 rounded-lg border transition ${
-                  day
-                    ? isToday
-                      ? 'bg-gradient-to-br from-purple-600/50 to-pink-600/50 border-purple-400'
-                      : 'bg-white/5 border-white/20 hover:border-white/40'
-                    : 'bg-transparent border-transparent'
-                }`}
-              >
-                {day && (
-                  <>
-                    <p className={`text-lg font-bold mb-1 ${isToday ? 'text-white' : 'text-gray-300'}`}>
-                      {day}
-                    </p>
-                    <div className="space-y-1">
-                      {dayTasks.slice(0, 2).map(task => (
-                        <div
-                          key={task._id}
-                          className={`text-xs p-1 rounded truncate ${
-                            task.priority === 'high'
-                              ? 'bg-red-500/30 text-red-200'
-                              : task.priority === 'medium'
-                              ? 'bg-yellow-500/30 text-yellow-200'
-                              : 'bg-green-500/30 text-green-200'
-                          }`}
-                          title={task.title}
-                        >
-                          {task.completed ? '✓' : '○'} {task.title}
+              <div key={d.toISOString()} className="bg-white/6 border border-white/8 rounded-2xl p-4">
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h3 className="text-white font-bold">{formatDayTitle(d)}</h3>
+                    <p className="text-xs text-gray-300">{format(d, 'yyyy-MM-dd')}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-gray-200 font-bold">{dayTasks.length} tasks</p>
+                    <p className="text-xs text-green-400">{completed} ✓</p>
+                    <p className="text-xs text-yellow-300">{pending} ⏳</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  {dayTasks.length > 0 ? (
+                    dayTasks.slice(0, 2).map((task) => (
+                      <div key={task._id} className="bg-white/4 p-3 rounded-lg">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className={`text-sm font-semibold ${task.completed ? 'line-through text-gray-300' : 'text-white'}`}>{task.title}</p>
+                            <p className="text-xs text-gray-300">{task.priority || 'medium'}</p>
+                          </div>
+                          <div className="text-xs text-gray-200">
+                            {task.dueDate ? new Date(task.dueDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--'}
+                          </div>
                         </div>
-                      ))}
-                      {dayTasks.length > 2 && (
-                        <p className="text-xs text-gray-400">+{dayTasks.length - 2} more</p>
-                      )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-6 text-gray-400">
+                      <p className="text-sm">No tasks</p>
                     </div>
-                  </>
+                  )}
+                </div>
+
+                {dayTasks.length > 2 && (
+                  <div className="mt-3 text-xs text-gray-300">
+                    +{dayTasks.length - 2} more
+                  </div>
                 )}
               </div>
             );
           })}
         </div>
-      </div>
-
-      {/* Tasks for Selected Dates */}
-      <div className="bg-gradient-to-br from-white/10 to-white/5 border border-white/20 rounded-2xl p-6">
-        <h3 className="text-2xl font-bold text-white mb-4">📋 Tasks by Date</h3>
-        
-        {Object.keys(tasksByDate)
-          .sort()
-          .slice(0, 5)
-          .map(dateString => (
-            <div key={dateString} className="mb-6 pb-6 border-b border-white/10 last:border-b-0">
-              <p className="text-lg font-bold text-purple-300 mb-3">
-                {new Date(dateString).toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {tasksByDate[dateString].map(task => (
-                  <div
-                    key={task._id}
-                    className="bg-white/5 border border-white/20 p-4 rounded-lg hover:border-white/40 transition"
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <h4 className={`font-bold ${task.completed ? 'line-through text-gray-500' : 'text-white'}`}>
-                        {task.title}
-                      </h4>
-                      <span className={`px-2 py-1 rounded text-xs font-bold text-white ${
-                        task.priority === 'high'
-                          ? 'bg-red-600'
-                          : task.priority === 'medium'
-                          ? 'bg-yellow-600'
-                          : 'bg-green-600'
-                      }`}>
-                        {task.priority}
-                      </span>
-                    </div>
-                    {task.description && (
-                      <p className="text-sm text-gray-300 mb-2">{task.description}</p>
-                    )}
-                    <div className="flex items-center justify-between text-xs text-gray-400">
-                      <span>
-                        {task.completed ? '✓ Completed' : '⏳ Pending'}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        
-        {Object.keys(tasksByDate).length === 0 && (
-          <div className="text-center py-8">
-            <p className="text-3xl mb-2">🎉</p>
-            <p className="text-gray-300">No tasks scheduled yet. Create one to get started!</p>
-          </div>
-        )}
       </div>
     </div>
   );
